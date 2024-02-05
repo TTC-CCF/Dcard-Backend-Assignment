@@ -167,8 +167,7 @@ type Condition struct {
 }
 
 type AdResponse struct {
-	Message string
-	Items   []struct {
+	Items []struct {
 		Title string
 		EndAt time.Time
 	}
