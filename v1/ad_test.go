@@ -2,11 +2,47 @@ package ad
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"encore.dev/beta/errs"
 )
+
+var s *Service
+
+func prepareFilteringMockData() {
+	banners := []Banner{
+		{Title: "TestAge", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 18, AgeEnd: 30, Gender: []string{"F"}, Country: []string{"TW", "JP"}, Platform: []string{"web"}},
+		{Title: "TestGender", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"M"}, Country: []string{"TW", "JP"}, Platform: []string{"web"}},
+		{Title: "TestCountry", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"F"}, Country: []string{"US", "UK"}, Platform: []string{"web"}},
+		{Title: "TestPlatform", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"F"}, Country: []string{"TW", "JP"}, Platform: []string{"ios", "android"}},
+	}
+	s.db.Exec("TRUNCATE banners")
+	s.db.Table("banners").Create(&banners)
+}
+
+func preparePaginationMockData() {
+	banners := []Banner{
+		{Title: "TestPagination1", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination2", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination3", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination4", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination5", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination6", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination7", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination8", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination9", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination10", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+	}
+	s.db.Exec("TRUNCATE banners")
+	s.db.Table("banners").Create(&banners)
+}
+
+func TestMain(m *testing.M) {
+	s, _ = initService()
+	os.Exit(m.Run())
+}
 
 func TestAdmin(t *testing.T) {
 	tests := []struct {
@@ -54,7 +90,7 @@ func TestAdmin(t *testing.T) {
 					AgeEnd:   18,
 				},
 			},
-			want: &errs.Error{Code: errs.InvalidArgument, Message: "AgeStart must be before AgeEnd"},
+			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age range"},
 		},
 		{
 			name: "Test Admin Error4",
@@ -82,8 +118,6 @@ func TestAdmin(t *testing.T) {
 		},
 	}
 
-	s, _ := initService()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := s.Admin(context.Background(), tt.input)
@@ -97,4 +131,85 @@ func TestAdmin(t *testing.T) {
 }
 
 func TestPublic(t *testing.T) {
+	tests := []struct {
+		name  string
+		input PublicParams
+		want  *AdResponse
+	}{
+		{
+			name: "Test Public Age",
+			input: PublicParams{
+				Age: 25,
+			},
+			want: &AdResponse{
+				Items: []Item{{Title: "TestAge"}},
+			},
+		},
+		{
+			name: "Test Public Gender",
+			input: PublicParams{
+				Gender: "M",
+			},
+			want: &AdResponse{
+				Items: []Item{{Title: "TestGender"}},
+			},
+		},
+		{
+			name: "Test Public Country",
+			input: PublicParams{
+				Country: "US",
+			},
+			want: &AdResponse{
+				Items: []Item{{Title: "TestCountry"}},
+			},
+		},
+		{
+			name: "Test Public Platform",
+			input: PublicParams{
+				Platform: "ios",
+			},
+			want: &AdResponse{
+				Items: []Item{{Title: "TestPlatform"}},
+			},
+		},
+		{
+			name: "Test Public Pagination",
+			input: PublicParams{
+				Limit:  4,
+				Offset: 5,
+			},
+			want: &AdResponse{
+				Items: []Item{
+					{Title: "TestPagination6"},
+					{Title: "TestPagination7"},
+					{Title: "TestPagination8"},
+					{Title: "TestPagination9"},
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		if i == 0 {
+			prepareFilteringMockData()
+		}
+		if i == 4 {
+			preparePaginationMockData()
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := s.Public(context.Background(), tt.input)
+			if got != nil {
+				for j := range got.Items {
+					if got.Items[j].Title != tt.want.Items[j].Title {
+						t.Errorf("Public() = %v, want %v", got, tt.want)
+					}
+					if got.Items[j].EndAt.Before(time.Now()) {
+						t.Errorf("Public() = %v, want %v", got, tt.want)
+					}
+				}
+			}
+
+		})
+	}
+
 }
