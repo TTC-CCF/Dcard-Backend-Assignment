@@ -2,12 +2,13 @@ package ad
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
-	"encore.app/v1/utils"
+	"golang.org/x/sync/singleflight"
+
 	"encore.dev/beta/errs"
-	"encore.dev/rlog"
 	"encore.dev/storage/cache"
 	"encore.dev/storage/sqldb"
 	"github.com/biter777/countries"
@@ -22,10 +23,19 @@ type Service struct {
 }
 
 type AdminParams struct {
-	Title      string    `json:"title"`
-	StartAt    time.Time `json:"startAt"`
-	EndAt      time.Time `json:"endAt"`
-	Conditions Condition `json:"conditions"`
+	ContentType string    `header:"Content-Type"`
+	Title       string    `json:"title"`
+	StartAt     time.Time `json:"startAt"`
+	EndAt       time.Time `json:"endAt"`
+	Conditions  Condition `json:"conditions"`
+}
+
+type Condition struct {
+	AgeStart int            `json:"ageStart"`
+	AgeEnd   int            `json:"ageEnd"`
+	Gender   pq.StringArray `json:"gender"`
+	Country  pq.StringArray `json:"country"`
+	Platform pq.StringArray `json:"platform"`
 }
 
 type PublicParams struct {
@@ -37,21 +47,13 @@ type PublicParams struct {
 	Platform string
 }
 
+type AdResponse struct {
+	Items []Item
+}
+
 type Item struct {
 	Title string
 	EndAt time.Time
-}
-
-type Condition struct {
-	AgeStart int            `json:"ageStart"`
-	AgeEnd   int            `json:"ageEnd"`
-	Gender   pq.StringArray `json:"gender"`
-	Country  pq.StringArray `json:"country"`
-	Platform pq.StringArray `json:"platform"`
-}
-
-type AdResponse struct {
-	Items []Item
 }
 
 type Banner struct {
@@ -66,32 +68,31 @@ type Banner struct {
 	Platform pq.StringArray `gorm:"type:varchar[]"`
 }
 
-type ConditionCache struct {
-	data []PublicParams
-}
+var sfg singleflight.Group
 
-type SearchCache struct {
-	data []Item
-}
-
-// for update cache data
-var ConditionKeyspace = cache.NewStructKeyspace[string, ConditionCache](utils.Cluster, cache.KeyspaceConfig{
-	KeyPattern:    "condition/:key",
-	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
-})
-
-// for search cache data
-var SearchKeyspace = cache.NewStructKeyspace[PublicParams, SearchCache](utils.Cluster, cache.KeyspaceConfig{
-	KeyPattern:    "search/:Limit/:Offset/:Age/:Gender/:Country/:Platform",
-	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+var Cluster = cache.NewCluster("backend", cache.ClusterConfig{
+	EvictionPolicy: cache.AllKeysLRU,
 })
 
 var adDB = sqldb.NewDatabase("api", sqldb.DatabaseConfig{
 	Migrations: "./migrations",
 })
 
-func initService() (*Service, error) {
+// key: age | gender | country | platform
+// value: []PublicParams
+var ConditionKeyspace = cache.NewStringKeyspace[string](Cluster, cache.KeyspaceConfig{
+	KeyPattern:    "condition/:key",
+	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+})
 
+// key: PublicParams
+// value: []Item
+var SearchKeyspace = cache.NewStringKeyspace[PublicParams](Cluster, cache.KeyspaceConfig{
+	KeyPattern:    "search/:Limit/:Offset/:Age/:Gender/:Country/:Platform",
+	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
+})
+
+func initService() (*Service, error) {
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: adDB.Stdlib(),
 	}))
@@ -103,65 +104,44 @@ func initService() (*Service, error) {
 }
 
 func updateKeyspaceWhenCreate(ctx context.Context, kind string) {
+	// Delete cache when create new banner
 	keys, err := ConditionKeyspace.Get(ctx, kind)
 	if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-		rlog.Error("ERR", "err", err)
 		return
 	}
 
-	for _, key := range keys.data {
+	var data []PublicParams
+	json.Unmarshal([]byte(keys), &data)
+
+	for _, key := range data {
 		SearchKeyspace.Delete(ctx, key)
 	}
+
+	ConditionKeyspace.Delete(ctx, kind)
 }
 
-func updateKeyspaceWhenRead(ctx context.Context, p PublicParams) {
-	if p.Age > 0 {
-		keys, err := ConditionKeyspace.Get(ctx, "age")
-		if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-			rlog.Error("ERR", "err", err)
-			return
-		}
-
-		keys.data = append(keys.data, p)
-		ConditionKeyspace.Set(ctx, "age", keys)
+func updateKeyspaceWhenRead(ctx context.Context, kind string, p PublicParams) {
+	// Append p to the keyspace given by kind
+	keys, err := ConditionKeyspace.Get(ctx, kind)
+	if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
+		return
 	}
 
-	if p.Country != "" {
-		keys, err := ConditionKeyspace.Get(ctx, "country")
-		if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-			rlog.Error("ERR", "err", err)
-			return
-		}
+	var data []PublicParams
+	json.Unmarshal([]byte(keys), &data)
 
-		keys.data = append(keys.data, p)
-		ConditionKeyspace.Set(ctx, "country", keys)
-	}
+	data = append(data, p)
 
-	if p.Gender != "" {
-		keys, err := ConditionKeyspace.Get(ctx, "gender")
-		if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-			rlog.Error("ERR", "err", err)
-			return
-		}
-
-		keys.data = append(keys.data, p)
-		ConditionKeyspace.Set(ctx, "gender", keys)
-	}
-
-	if p.Platform != "" {
-		keys, err := ConditionKeyspace.Get(ctx, "platform")
-		if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-			rlog.Error("ERR", "err", err)
-			return
-		}
-
-		keys.data = append(keys.data, p)
-		ConditionKeyspace.Set(ctx, "platform", keys)
-	}
+	jsonData, _ := json.Marshal(data)
+	ConditionKeyspace.Set(ctx, kind, string(jsonData))
 }
 
 //encore:api public method=POST path=/api/v1/ad
 func (s *Service) Admin(ctx context.Context, p AdminParams) error {
+	if p.ContentType != "application/json" {
+		return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid Content-Type"}
+	}
+
 	if p.Title == "" || p.StartAt.IsZero() || p.EndAt.IsZero() {
 		return &errs.Error{Code: errs.InvalidArgument, Message: "Title, startAt and endAt are required"}
 	}
@@ -174,12 +154,18 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 		return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age range"}
 	}
 
-	if len(p.Conditions.Gender) > 0 {
+	if (p.Conditions.AgeStart == 0 || p.Conditions.AgeEnd == 0) && p.Conditions.AgeStart != p.Conditions.AgeEnd {
+		return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age range"}
+	}
+
+	if p.Conditions.Gender != nil {
 		for _, g := range p.Conditions.Gender {
 			if g != "M" && g != "F" {
 				return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid gender"}
 			}
 		}
+	} else {
+		p.Conditions.Gender = []string{}
 	}
 
 	if p.Conditions.Country != nil {
@@ -188,6 +174,18 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 				return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid country"}
 			}
 		}
+	} else {
+		p.Conditions.Country = []string{}
+	}
+
+	if p.Conditions.Platform != nil {
+		for _, platform := range p.Conditions.Platform {
+			if platform != "ios" && platform != "android" && platform != "web" {
+				return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid platform"}
+			}
+		}
+	} else {
+		p.Conditions.Platform = []string{}
 	}
 
 	if p.Conditions.AgeStart > 0 && p.Conditions.AgeEnd < 100 {
@@ -226,8 +224,6 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 
 //encore:api public method=GET path=/api/v1/ad
 func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, error) {
-	rlog.Debug("DBG", "params", p)
-
 	if p.Age < 0 || p.Age > 100 {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age"}
 	}
@@ -240,50 +236,64 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, erro
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Invalid gender"}
 	}
 
-	if len(p.Platform) > 255 {
-		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Platform is too long"}
+	if p.Platform != "" && p.Platform != "ios" && p.Platform != "android" && p.Platform != "web" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Invalid platform"}
 	}
 
 	if p.Limit == 0 {
 		p.Limit = 5
 	}
 
-	// get data from cache
-	searchCache, err := SearchKeyspace.Get(ctx, p)
+	// Check if other request is already fetching the data from cache by singleflight group
+	key, _ := json.Marshal(p)
+	searchCache, err, _ := sfg.Do(string(key), func() (interface{}, error) {
+		return SearchKeyspace.Get(ctx, p)
+	})
+
 	if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
-		rlog.Error("ERR", "err", err)
 		return nil, &errs.Error{Code: errs.Internal}
 	}
 
+	var data []Item
+	json.Unmarshal([]byte(searchCache.(string)), &data)
+
 	items := []Item{}
 
-	if len(searchCache.data) == 0 {
+	if len(data) == 0 {
 		query := "? BETWEEN start_at AND end_at"
 		queryParams := []interface{}{time.Now()}
 		if p.Age != 0 {
-			query += " AND (? BETWEEN age_start AND age_end OR age_start IS NULL AND age_end IS NULL)"
+			query += " AND (? BETWEEN age_start AND age_end OR age_start = 0 AND age_end = 0)"
 			queryParams = append(queryParams, p.Age)
 		}
 
 		if p.Country != "" {
-			query += " AND (? = ANY(country) OR country IS NULL)"
+			query += " AND (country @> ARRAY[?::character varying] OR country = '{}')"
 			queryParams = append(queryParams, p.Country)
 		}
 
 		if p.Gender != "" {
-			query += " AND (? = ANY(gender) OR gender IS NULL)"
+			query += " AND (gender @> ARRAY[?::character] OR gender = '{}')"
 			queryParams = append(queryParams, p.Gender)
 		}
 
 		if p.Platform != "" {
-			query += " AND (? = ANY(platform) OR platform IS NULL)"
+			query += " AND (platform @> ARRAY[?::character varying] OR platform = '{}')"
 			queryParams = append(queryParams, p.Platform)
 		}
 
-		var banners []Banner
-		if err := s.db.Table("banners").Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners).Error; err != nil {
+		// also need singleflight group to prevent multiple requests to the database
+		data, err, _ := sfg.Do(string(key), func() (interface{}, error) {
+			var banners []Banner
+			err := s.db.Table("banners").Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners).Error
+			return banners, err
+		})
+
+		if err != nil {
 			return nil, &errs.Error{Code: errs.Internal}
 		}
+
+		banners := data.([]Banner)
 
 		if len(banners) != 0 {
 			for _, banner := range banners {
@@ -291,18 +301,31 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, erro
 			}
 
 			// set data to cache
-			searchCache.data = items
-			if err := SearchKeyspace.Set(ctx, p, searchCache); err != nil {
-				rlog.Error("ERR", "err", err)
+			jsonData, _ := json.Marshal(items)
+			if err := SearchKeyspace.Set(ctx, p, string(jsonData)); err != nil {
 				return nil, &errs.Error{Code: errs.Internal}
 			}
 
-			updateKeyspaceWhenRead(ctx, p)
+			if p.Age != 0 {
+				updateKeyspaceWhenRead(ctx, "age", p)
+			}
+
+			if p.Country != "" {
+				updateKeyspaceWhenRead(ctx, "country", p)
+			}
+
+			if p.Gender != "" {
+				updateKeyspaceWhenRead(ctx, "gender", p)
+			}
+
+			if p.Platform != "" {
+				updateKeyspaceWhenRead(ctx, "platform", p)
+			}
 		}
 
 	} else {
-		rlog.Debug("DBG", "cache key", p, "data", searchCache.data)
-		items = searchCache.data
+		// rlog.Debug("DBG", "cache key", p, "data", data)
+		items = data
 	}
 
 	return &AdResponse{Items: items}, nil

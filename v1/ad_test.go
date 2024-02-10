@@ -2,11 +2,14 @@ package ad
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"encore.dev/beta/errs"
+	"encore.dev/storage/cache"
 )
 
 var s *Service
@@ -44,6 +47,66 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestUpdateKeyspaceWhenCreate(t *testing.T) {
+	param := []PublicParams{
+		{Limit: 10, Offset: 3, Age: 25, Gender: "M", Country: "TW", Platform: "web"},
+		{Age: 25, Gender: "M"},
+		{Age: 30, Country: "JP"},
+		{Age: 10, Platform: "ios"},
+	}
+	jsonData, _ := json.Marshal(param)
+	ConditionKeyspace.Set(context.Background(), "age", string(jsonData))
+
+	for _, p := range param {
+		SearchKeyspace.Set(context.Background(), p, "data that queried from database")
+	}
+
+	updateKeyspaceWhenCreate(context.Background(), "age")
+
+	_, err := ConditionKeyspace.Get(context.Background(), "age")
+	if !strings.Contains(err.Error(), cache.Miss.Error()) {
+		t.Error("updateKeyspaceWhenCreate() not delete keyspace")
+	}
+
+	for _, p := range param {
+		_, err := SearchKeyspace.Get(context.Background(), p)
+		if !strings.Contains(err.Error(), cache.Miss.Error()) {
+			t.Error("updateKeyspaceWhenCreate() not delete keyspace")
+		}
+	}
+}
+
+func TestUpdateKeyspaceWhenRead(t *testing.T) {
+	param := []PublicParams{
+		{Limit: 10, Offset: 3, Age: 25, Gender: "M", Country: "TW", Platform: "web"},
+		{Age: 25, Gender: "M"},
+		{Age: 30, Country: "JP"},
+		{Age: 10, Platform: "ios"},
+	}
+	jsonData, _ := json.Marshal(param)
+	ConditionKeyspace.Set(context.Background(), "age", string(jsonData))
+
+	newParam := PublicParams{
+		Age:    25,
+		Limit:  100,
+		Offset: 40,
+	}
+
+	updateKeyspaceWhenRead(context.Background(), "age", newParam)
+
+	var got []PublicParams
+	data, _ := ConditionKeyspace.Get(context.Background(), "age")
+	json.Unmarshal([]byte(data), &got)
+
+	want := append(param, newParam)
+
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("updateKeyspaceWhenRead() = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestAdmin(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -53,9 +116,10 @@ func TestAdmin(t *testing.T) {
 		{
 			name: "Test Admin Normal",
 			input: AdminParams{
-				Title:   "Test",
-				StartAt: time.Now(),
-				EndAt:   time.Now().Add(24 * time.Hour),
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
 				Conditions: Condition{
 					AgeStart: 18,
 					AgeEnd:   30,
@@ -66,25 +130,29 @@ func TestAdmin(t *testing.T) {
 			want: nil,
 		},
 		{
-			name:  "Test Admin Error1",
-			input: AdminParams{},
-			want:  &errs.Error{Code: errs.InvalidArgument, Message: "Title, startAt and endAt are required"},
+			name: "Test Admin Argument Error",
+			input: AdminParams{
+				ContentType: "application/json",
+			},
+			want: &errs.Error{Code: errs.InvalidArgument, Message: "Title, startAt and endAt are required"},
 		},
 		{
-			name: "Test Admin Error2",
+			name: "Test Admin Time Error",
 			input: AdminParams{
-				Title:   "Test",
-				StartAt: time.Now().Add(24 * time.Hour),
-				EndAt:   time.Now(),
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now().Add(24 * time.Hour),
+				EndAt:       time.Now(),
 			},
 			want: &errs.Error{Code: errs.InvalidArgument, Message: "StartAt must be before EndAt"},
 		},
 		{
-			name: "Test Admin Error3",
+			name: "Test Admin Age Error",
 			input: AdminParams{
-				Title:   "Test",
-				StartAt: time.Now(),
-				EndAt:   time.Now().Add(24 * time.Hour),
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
 				Conditions: Condition{
 					AgeStart: 30,
 					AgeEnd:   18,
@@ -93,11 +161,12 @@ func TestAdmin(t *testing.T) {
 			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age range"},
 		},
 		{
-			name: "Test Admin Error4",
+			name: "Test Admin Gender Error",
 			input: AdminParams{
-				Title:   "Test",
-				StartAt: time.Now(),
-				EndAt:   time.Now().Add(24 * time.Hour),
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
 				Conditions: Condition{
 					Gender: []string{"M", "F", "O"},
 				},
@@ -105,16 +174,40 @@ func TestAdmin(t *testing.T) {
 			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid gender"},
 		},
 		{
-			name: "Test Admin Error5",
+			name: "Test Admin Country Error",
 			input: AdminParams{
-				Title:   "Test",
-				StartAt: time.Now(),
-				EndAt:   time.Now().Add(24 * time.Hour),
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
 				Conditions: Condition{
 					Country: []string{"TW", "JP", "XX"},
 				},
 			},
 			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid country"},
+		},
+		{
+			name: "Test Admin Platform Error",
+			input: AdminParams{
+				ContentType: "application/json",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
+				Conditions: Condition{
+					Platform: []string{"web", "ios", "android", "evil"},
+				},
+			},
+			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid platform"},
+		},
+		{
+			name: "Test Admin Content-Type Error",
+			input: AdminParams{
+				ContentType: "text/html",
+				Title:       "Test",
+				StartAt:     time.Now(),
+				EndAt:       time.Now().Add(24 * time.Hour),
+			},
+			want: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid Content-Type"},
 		},
 	}
 
@@ -132,9 +225,10 @@ func TestAdmin(t *testing.T) {
 
 func TestPublic(t *testing.T) {
 	tests := []struct {
-		name  string
-		input PublicParams
-		want  *AdResponse
+		name    string
+		input   PublicParams
+		want    *AdResponse
+		wantErr error
 	}{
 		{
 			name: "Test Public Age",
@@ -187,6 +281,34 @@ func TestPublic(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Test Public Age Error",
+			input: PublicParams{
+				Age: 101,
+			},
+			wantErr: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age"},
+		},
+		{
+			name: "Test Public Country Error",
+			input: PublicParams{
+				Country: "EVIL",
+			},
+			wantErr: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid country"},
+		},
+		{
+			name: "Test Public Gender Error",
+			input: PublicParams{
+				Gender: "EVIL",
+			},
+			wantErr: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid gender"},
+		},
+		{
+			name: "Test Public Platform Error",
+			input: PublicParams{
+				Platform: "EVIL",
+			},
+			wantErr: &errs.Error{Code: errs.InvalidArgument, Message: "Invalid platform"},
+		},
 	}
 
 	for i, tt := range tests {
@@ -197,8 +319,8 @@ func TestPublic(t *testing.T) {
 			preparePaginationMockData()
 		}
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := s.Public(context.Background(), tt.input)
-			if got != nil {
+			got, err := s.Public(context.Background(), tt.input)
+			if tt.want != nil {
 				for j := range got.Items {
 					if got.Items[j].Title != tt.want.Items[j].Title {
 						t.Errorf("Public() = %v, want %v", got, tt.want)
@@ -208,8 +330,12 @@ func TestPublic(t *testing.T) {
 					}
 				}
 			}
+			if tt.wantErr != nil {
+				if err.Error() != tt.wantErr.Error() {
+					t.Errorf("Public() = %v, want %v", got, tt.want)
+				}
+			}
 
 		})
 	}
-
 }
