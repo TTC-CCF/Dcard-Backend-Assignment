@@ -41,12 +41,12 @@ type Condition struct {
 
 // PublicParams represents the input parameters for the Public method.
 type PublicParams struct {
-	Limit    int
-	Offset   int
-	Age      int
-	Gender   string
-	Country  string
-	Platform string
+	Limit    int    `query:"limit"`
+	Offset   int    `query:"offset"`
+	Age      int    `query:"age"`
+	Gender   string `query:"gender"`
+	Country  string `query:"country"`
+	Platform string `query:"platform"`
 }
 
 // PublicResponse represents the output parameters for the Public method.

@@ -18,13 +18,11 @@
 - `migration`: 資料庫遷移檔案
 - `ad.go`: API邏輯，包含資料庫操作
 - `ad_test.go`: API測試
+
 ### How to run
 1. [安裝Encore CLI](https://encore.dev/docs/quick-start), Go 1.16以上
 2. `git clone`後，`cd`到專案目錄
 3. `encore run` 
-
->[!NOTE]
->在encore主控介面可以呼叫API，但是GET的功能好像沒辦法用他的介面傳遞url query參數，所以建議使用Postman或其他工具呼叫API
 
 ### Techniques
 - **Cache:**  
