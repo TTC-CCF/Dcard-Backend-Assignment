@@ -22,6 +22,7 @@ type Service struct {
 	db *gorm.DB
 }
 
+// AdminParams represents the input parameters for the Admin method.
 type AdminParams struct {
 	ContentType string    `header:"Content-Type"`
 	Title       string    `json:"title"`
@@ -38,6 +39,7 @@ type Condition struct {
 	Platform pq.StringArray `json:"platform"`
 }
 
+// PublicParams represents the input parameters for the Public method.
 type PublicParams struct {
 	Limit    int
 	Offset   int
@@ -47,15 +49,17 @@ type PublicParams struct {
 	Platform string
 }
 
-type AdResponse struct {
-	Items []Item
+// PublicResponse represents the output parameters for the Public method.
+type PublicResponse struct {
+	Items []Item `json:"items"`
 }
 
 type Item struct {
-	Title string
-	EndAt time.Time
+	Title string    `json:"title"`
+	EndAt time.Time `json:"endAt"`
 }
 
+// Banner represents the database model for the banners table.
 type Banner struct {
 	ID       uint
 	Title    string
@@ -92,6 +96,7 @@ var SearchKeyspace = cache.NewStringKeyspace[PublicParams](Cluster, cache.Keyspa
 	DefaultExpiry: cache.ExpireIn(5 * time.Minute),
 })
 
+// encore will run this function on startup
 func initService() (*Service, error) {
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: adDB.Stdlib(),
@@ -103,7 +108,7 @@ func initService() (*Service, error) {
 	return &Service{db: db}, nil
 }
 
-func updateKeyspaceWhenCreate(ctx context.Context, kind string) {
+func deleteKeyspaceWhenCreate(ctx context.Context, kind string) {
 	// Delete cache when create new banner
 	keys, err := ConditionKeyspace.Get(ctx, kind)
 	if err != nil && !strings.Contains(err.Error(), cache.Miss.Error()) {
@@ -138,6 +143,7 @@ func updateKeyspaceWhenRead(ctx context.Context, kind string, p PublicParams) {
 
 //encore:api public method=POST path=/api/v1/ad
 func (s *Service) Admin(ctx context.Context, p AdminParams) error {
+	// Validate the input parameters
 	if p.ContentType != "application/json" {
 		return &errs.Error{Code: errs.InvalidArgument, Message: "Invalid Content-Type"}
 	}
@@ -188,20 +194,21 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 		p.Conditions.Platform = []string{}
 	}
 
+	// Delete the corresponding cache when create new banner
 	if p.Conditions.AgeStart > 0 && p.Conditions.AgeEnd < 100 {
-		updateKeyspaceWhenCreate(ctx, "age")
+		deleteKeyspaceWhenCreate(ctx, "age")
 	}
 
 	if p.Conditions.Gender != nil {
-		updateKeyspaceWhenCreate(ctx, "gender")
+		deleteKeyspaceWhenCreate(ctx, "gender")
 	}
 
 	if p.Conditions.Country != nil {
-		updateKeyspaceWhenCreate(ctx, "country")
+		deleteKeyspaceWhenCreate(ctx, "country")
 	}
 
 	if p.Conditions.Platform != nil {
-		updateKeyspaceWhenCreate(ctx, "platform")
+		deleteKeyspaceWhenCreate(ctx, "platform")
 	}
 
 	banner := Banner{
@@ -215,6 +222,7 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 		Platform: p.Conditions.Platform,
 	}
 
+	// Create new banner
 	if err := s.db.Table("banners").Create(&banner).Error; err != nil {
 		return &errs.Error{Code: errs.Internal}
 	}
@@ -223,7 +231,8 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 }
 
 //encore:api public method=GET path=/api/v1/ad
-func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, error) {
+func (s *Service) Public(ctx context.Context, p PublicParams) (*PublicResponse, error) {
+	// Validate the input parameters
 	if p.Age < 0 || p.Age > 100 {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "Invalid age"}
 	}
@@ -259,6 +268,7 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, erro
 
 	items := []Item{}
 
+	// If cache miss, fetch data from database. Otherwise, return the data from cache
 	if len(data) == 0 {
 		query := "? BETWEEN start_at AND end_at"
 		queryParams := []interface{}{time.Now()}
@@ -282,7 +292,7 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, erro
 			queryParams = append(queryParams, p.Platform)
 		}
 
-		// also need singleflight group to prevent multiple requests to the database
+		// Also need singleflight group to prevent multiple requests to the database
 		data, err, _ := sfg.Do(string(key), func() (interface{}, error) {
 			var banners []Banner
 			err := s.db.Table("banners").Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners).Error
@@ -324,9 +334,8 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*AdResponse, erro
 		}
 
 	} else {
-		// rlog.Debug("DBG", "cache key", p, "data", data)
 		items = data
 	}
 
-	return &AdResponse{Items: items}, nil
+	return &PublicResponse{Items: items}, nil
 }

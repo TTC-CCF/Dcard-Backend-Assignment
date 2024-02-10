@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestUpdateKeyspaceWhenCreate(t *testing.T) {
+func TestDeleteKeyspaceWhenCreate(t *testing.T) {
 	param := []PublicParams{
 		{Limit: 10, Offset: 3, Age: 25, Gender: "M", Country: "TW", Platform: "web"},
 		{Age: 25, Gender: "M"},
@@ -61,17 +61,17 @@ func TestUpdateKeyspaceWhenCreate(t *testing.T) {
 		SearchKeyspace.Set(context.Background(), p, "data that queried from database")
 	}
 
-	updateKeyspaceWhenCreate(context.Background(), "age")
+	deleteKeyspaceWhenCreate(context.Background(), "age")
 
 	_, err := ConditionKeyspace.Get(context.Background(), "age")
 	if !strings.Contains(err.Error(), cache.Miss.Error()) {
-		t.Error("updateKeyspaceWhenCreate() not delete keyspace")
+		t.Error("deleteKeyspaceWhenCreate() not delete keyspace")
 	}
 
 	for _, p := range param {
 		_, err := SearchKeyspace.Get(context.Background(), p)
 		if !strings.Contains(err.Error(), cache.Miss.Error()) {
-			t.Error("updateKeyspaceWhenCreate() not delete keyspace")
+			t.Error("deleteKeyspaceWhenCreate() not delete keyspace")
 		}
 	}
 }
@@ -227,7 +227,7 @@ func TestPublic(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   PublicParams
-		want    *AdResponse
+		want    *PublicResponse
 		wantErr error
 	}{
 		{
@@ -235,7 +235,7 @@ func TestPublic(t *testing.T) {
 			input: PublicParams{
 				Age: 25,
 			},
-			want: &AdResponse{
+			want: &PublicResponse{
 				Items: []Item{{Title: "TestAge"}},
 			},
 		},
@@ -244,7 +244,7 @@ func TestPublic(t *testing.T) {
 			input: PublicParams{
 				Gender: "M",
 			},
-			want: &AdResponse{
+			want: &PublicResponse{
 				Items: []Item{{Title: "TestGender"}},
 			},
 		},
@@ -253,7 +253,7 @@ func TestPublic(t *testing.T) {
 			input: PublicParams{
 				Country: "US",
 			},
-			want: &AdResponse{
+			want: &PublicResponse{
 				Items: []Item{{Title: "TestCountry"}},
 			},
 		},
@@ -262,7 +262,7 @@ func TestPublic(t *testing.T) {
 			input: PublicParams{
 				Platform: "ios",
 			},
-			want: &AdResponse{
+			want: &PublicResponse{
 				Items: []Item{{Title: "TestPlatform"}},
 			},
 		},
@@ -272,7 +272,7 @@ func TestPublic(t *testing.T) {
 				Limit:  4,
 				Offset: 5,
 			},
-			want: &AdResponse{
+			want: &PublicResponse{
 				Items: []Item{
 					{Title: "TestPagination6"},
 					{Title: "TestPagination7"},
