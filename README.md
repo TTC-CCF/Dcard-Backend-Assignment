@@ -69,3 +69,13 @@ encore test ./...
 - `TestPublic`  
     測試Public API，包含錯誤處理
 
+---
+
+##### TODO
+- [x] Learn Encore
+- [x] API function
+- [x] Cache mechanism
+- [x] Test
+- [ ] Deploy on GKE
+- [ ] Load test
+
