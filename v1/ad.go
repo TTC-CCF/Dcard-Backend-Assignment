@@ -10,10 +10,8 @@ import (
 
 	"encore.dev/beta/errs"
 	"encore.dev/storage/cache"
-	"encore.dev/storage/sqldb"
 	"github.com/biter777/countries"
 	"github.com/lib/pq"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -24,14 +22,14 @@ type Service struct {
 
 // AdminParams represents the input parameters for the Admin method.
 type AdminParams struct {
-	ContentType string    `header:"Content-Type"`
-	Title       string    `json:"title"`
-	StartAt     time.Time `json:"startAt"`
-	EndAt       time.Time `json:"endAt"`
-	Conditions  Condition `json:"conditions"`
+	ContentType string          `header:"Content-Type"`
+	Title       string          `json:"title"`
+	StartAt     time.Time       `json:"startAt"`
+	EndAt       time.Time       `json:"endAt"`
+	Conditions  ConditionParams `json:"conditions"`
 }
 
-type Condition struct {
+type ConditionParams struct {
 	AgeStart int            `json:"ageStart"`
 	AgeEnd   int            `json:"ageEnd"`
 	Gender   pq.StringArray `json:"gender"`
@@ -59,27 +57,10 @@ type Item struct {
 	EndAt time.Time `json:"endAt"`
 }
 
-// Banner represents the database model for the banners table.
-type Banner struct {
-	ID       uint
-	Title    string
-	StartAt  time.Time
-	EndAt    time.Time
-	AgeStart int
-	AgeEnd   int
-	Gender   pq.StringArray `gorm:"type:varchar[]"`
-	Country  pq.StringArray `gorm:"type:varchar[]"`
-	Platform pq.StringArray `gorm:"type:varchar[]"`
-}
-
 var sfg singleflight.Group
 
 var Cluster = cache.NewCluster("backend", cache.ClusterConfig{
 	EvictionPolicy: cache.AllKeysLRU,
-})
-
-var adDB = sqldb.NewDatabase("api", sqldb.DatabaseConfig{
-	Migrations: "./migrations",
 })
 
 // key: age | gender | country | platform
@@ -98,9 +79,7 @@ var SearchKeyspace = cache.NewStringKeyspace[PublicParams](Cluster, cache.Keyspa
 
 // encore will run this function on startup
 func initService() (*Service, error) {
-	db, err := gorm.Open(postgres.New(postgres.Config{
-		Conn: adDB.Stdlib(),
-	}))
+	db, err := InitDB()
 
 	if err != nil {
 		return nil, err
@@ -211,23 +190,8 @@ func (s *Service) Admin(ctx context.Context, p AdminParams) error {
 		deleteKeyspaceWhenCreate(ctx, "platform")
 	}
 
-	banner := Banner{
-		Title:    p.Title,
-		StartAt:  p.StartAt,
-		EndAt:    p.EndAt,
-		AgeStart: p.Conditions.AgeStart,
-		AgeEnd:   p.Conditions.AgeEnd,
-		Gender:   p.Conditions.Gender,
-		Country:  p.Conditions.Country,
-		Platform: p.Conditions.Platform,
-	}
-
 	// Create new banner
-	if err := s.db.Table("banners").Create(&banner).Error; err != nil {
-		return &errs.Error{Code: errs.Internal}
-	}
-
-	return nil
+	return s.CreateBanner(p)
 }
 
 //encore:api public method=GET path=/api/v1/ad
@@ -266,50 +230,22 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*PublicResponse, 
 	var data []Item
 	json.Unmarshal([]byte(searchCache.(string)), &data)
 
-	items := []Item{}
+	var items []Item
 
 	// If cache miss, fetch data from database. Otherwise, return the data from cache
 	if len(data) == 0 {
-		query := "? BETWEEN start_at AND end_at"
-		queryParams := []interface{}{time.Now()}
-		if p.Age != 0 {
-			query += " AND (? BETWEEN age_start AND age_end OR age_start = 0 AND age_end = 0)"
-			queryParams = append(queryParams, p.Age)
-		}
-
-		if p.Country != "" {
-			query += " AND (country @> ARRAY[?::character varying] OR country = '{}')"
-			queryParams = append(queryParams, p.Country)
-		}
-
-		if p.Gender != "" {
-			query += " AND (gender @> ARRAY[?::character] OR gender = '{}')"
-			queryParams = append(queryParams, p.Gender)
-		}
-
-		if p.Platform != "" {
-			query += " AND (platform @> ARRAY[?::character varying] OR platform = '{}')"
-			queryParams = append(queryParams, p.Platform)
-		}
-
 		// Also need singleflight group to prevent multiple requests to the database
 		data, err, _ := sfg.Do(string(key), func() (interface{}, error) {
-			var banners []Banner
-			err := s.db.Table("banners").Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners).Error
-			return banners, err
+			return s.SearchBanners(p)
 		})
 
 		if err != nil {
 			return nil, &errs.Error{Code: errs.Internal}
 		}
 
-		banners := data.([]Banner)
+		items = data.([]Item)
 
-		if len(banners) != 0 {
-			for _, banner := range banners {
-				items = append(items, Item{Title: banner.Title, EndAt: banner.EndAt})
-			}
-
+		if len(items) != 0 {
 			// set data to cache
 			jsonData, _ := json.Marshal(items)
 			if err := SearchKeyspace.Set(ctx, p, string(jsonData)); err != nil {
@@ -331,6 +267,8 @@ func (s *Service) Public(ctx context.Context, p PublicParams) (*PublicResponse, 
 			if p.Platform != "" {
 				updateKeyspaceWhenRead(ctx, "platform", p)
 			}
+		} else {
+			items = []Item{}
 		}
 
 	} else {

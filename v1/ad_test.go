@@ -16,13 +16,13 @@ var s *Service
 
 func prepareFilteringMockData() {
 	banners := []Banner{
-		{Title: "TestAge", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 18, AgeEnd: 30, Gender: []string{"F"}, Country: []string{"TW", "JP"}, Platform: []string{"web"}},
-		{Title: "TestGender", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"M"}, Country: []string{"TW", "JP"}, Platform: []string{"web"}},
-		{Title: "TestCountry", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"F"}, Country: []string{"US", "UK"}, Platform: []string{"web"}},
-		{Title: "TestPlatform", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Gender: []string{"F"}, Country: []string{"TW", "JP"}, Platform: []string{"ios", "android"}},
+		{Title: "TestAge", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 18, AgeEnd: 30, Genders: []Gender{{Name: "F"}}, Countries: []Country{{Name: "TW"}, {Name: "JP"}}, Platforms: []Platform{{Name: "web"}}},
+		{Title: "TestGender", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Genders: []Gender{{Name: "M"}}, Countries: []Country{{Name: "TW"}, {Name: "JP"}}, Platforms: []Platform{{Name: "web"}}},
+		{Title: "TestCountry", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Genders: []Gender{{Name: "F"}}, Countries: []Country{{Name: "US"}, {Name: "UK"}}, Platforms: []Platform{{Name: "web"}}},
+		{Title: "TestPlatform", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40, Genders: []Gender{{Name: "F"}}, Countries: []Country{{Name: "TW"}, {Name: "JP"}}, Platforms: []Platform{{Name: "web"}, {Name: "android"}}},
 	}
-	s.db.Exec("TRUNCATE banners")
-	s.db.Table("banners").Create(&banners)
+	s.db.Delete(&Banner{}, "1=1")
+	s.db.Create(&banners)
 }
 
 func preparePaginationMockData() {
@@ -38,8 +38,8 @@ func preparePaginationMockData() {
 		{Title: "TestPagination9", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
 		{Title: "TestPagination10", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
 	}
-	s.db.Exec("TRUNCATE banners")
-	s.db.Table("banners").Create(&banners)
+	s.db.Delete(&Banner{}, "1=1")
+	s.db.Create(&banners)
 }
 
 func TestMain(m *testing.M) {
@@ -120,7 +120,7 @@ func TestAdmin(t *testing.T) {
 				Title:       "Test",
 				StartAt:     time.Now(),
 				EndAt:       time.Now().Add(24 * time.Hour),
-				Conditions: Condition{
+				Conditions: ConditionParams{
 					AgeStart: 18,
 					AgeEnd:   30,
 					Country:  []string{"TW", "JP"},
@@ -153,7 +153,7 @@ func TestAdmin(t *testing.T) {
 				Title:       "Test",
 				StartAt:     time.Now(),
 				EndAt:       time.Now().Add(24 * time.Hour),
-				Conditions: Condition{
+				Conditions: ConditionParams{
 					AgeStart: 30,
 					AgeEnd:   18,
 				},
@@ -167,7 +167,7 @@ func TestAdmin(t *testing.T) {
 				Title:       "Test",
 				StartAt:     time.Now(),
 				EndAt:       time.Now().Add(24 * time.Hour),
-				Conditions: Condition{
+				Conditions: ConditionParams{
 					Gender: []string{"M", "F", "O"},
 				},
 			},
@@ -180,7 +180,7 @@ func TestAdmin(t *testing.T) {
 				Title:       "Test",
 				StartAt:     time.Now(),
 				EndAt:       time.Now().Add(24 * time.Hour),
-				Conditions: Condition{
+				Conditions: ConditionParams{
 					Country: []string{"TW", "JP", "XX"},
 				},
 			},
@@ -193,7 +193,7 @@ func TestAdmin(t *testing.T) {
 				Title:       "Test",
 				StartAt:     time.Now(),
 				EndAt:       time.Now().Add(24 * time.Hour),
-				Conditions: Condition{
+				Conditions: ConditionParams{
 					Platform: []string{"web", "ios", "android", "evil"},
 				},
 			},
@@ -311,10 +311,9 @@ func TestPublic(t *testing.T) {
 		},
 	}
 
+	prepareFilteringMockData()
+
 	for i, tt := range tests {
-		if i == 0 {
-			prepareFilteringMockData()
-		}
 		if i == 4 {
 			preparePaginationMockData()
 		}
