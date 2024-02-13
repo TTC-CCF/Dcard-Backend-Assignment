@@ -36,7 +36,7 @@ type Platform struct {
 	Name string
 }
 
-var adDB = sqldb.NewDatabase("api", sqldb.DatabaseConfig{Migrations: "./"})
+var adDB = sqldb.NewDatabase("api", sqldb.DatabaseConfig{Migrations: "./migrations"})
 
 func InitDB() (*gorm.DB, error) {
 	db, _ := gorm.Open(postgres.New(postgres.Config{
