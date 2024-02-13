@@ -44,7 +44,7 @@
     因為我有使用到Cache來降低資料庫負擔，而Public API又需要高併發的能力，所以我使用SingleFlight來避免Cache穿透的問題。當多個goroutine同時存取Cache時，會將相同的key合併成一個request，只有一個goroutine會去存取資料庫。
 
 - **Database Normalization:**  
-    對於Gender, Country, Platform三個欄位採用many to many的關係，搭配GORM建立schema，增加查詢效能。  
+    對於Gender, Country, Platform三個欄位採用many to many的關係，加上GORM在conjunction table上會建立index，優化查詢效能。  
     此資料庫設計達到3NF
     ![er-diagram](/assets/er_diagram.png)
 
