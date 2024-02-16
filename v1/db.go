@@ -105,13 +105,13 @@ func (s *Service) SearchBanners(p PublicParams) ([]Item, error) {
 
 	res := s.db.
 		Distinct("banners.id, banners.title, banners.end_at").
-		Joins("JOIN banner_gender ON banners.id = banner_gender.banner_id").
-		Joins("JOIN genders ON genders.id = banner_gender.gender_id").
-		Joins("JOIN banner_country ON banners.id = banner_country.banner_id").
-		Joins("JOIN countries ON countries.id = banner_country.country_id").
-		Joins("JOIN banner_platform ON banners.id = banner_platform.banner_id").
-		Joins("JOIN platforms ON platforms.id = banner_platform.platform_id").
-		Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners)
+		Joins("LEFT JOIN banner_gender ON banners.id = banner_gender.banner_id").
+		Joins("LEFT JOIN genders ON genders.id = banner_gender.gender_id").
+		Joins("LEFT JOIN banner_country ON banners.id = banner_country.banner_id").
+		Joins("LEFT JOIN countries ON countries.id = banner_country.country_id").
+		Joins("LEFT JOIN banner_platform ON banners.id = banner_platform.banner_id").
+		Joins("LEFT JOIN platforms ON platforms.id = banner_platform.platform_id").
+		Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Order("end_at asc").Find(&banners)
 
 	err := res.Error
 	if err != nil {

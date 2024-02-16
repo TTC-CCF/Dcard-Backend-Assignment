@@ -27,16 +27,16 @@ func prepareFilteringMockData() {
 
 func preparePaginationMockData() {
 	banners := []Banner{
-		{Title: "TestPagination1", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination2", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination3", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination4", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination5", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination6", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination7", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination8", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination9", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
-		{Title: "TestPagination10", StartAt: time.Now(), EndAt: time.Now().Add(24 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination1", StartAt: time.Now(), EndAt: time.Now().Add(1 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination2", StartAt: time.Now(), EndAt: time.Now().Add(2 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination3", StartAt: time.Now(), EndAt: time.Now().Add(3 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination4", StartAt: time.Now(), EndAt: time.Now().Add(4 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination5", StartAt: time.Now(), EndAt: time.Now().Add(5 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination6", StartAt: time.Now(), EndAt: time.Now().Add(6 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination7", StartAt: time.Now(), EndAt: time.Now().Add(7 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination8", StartAt: time.Now(), EndAt: time.Now().Add(8 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination9", StartAt: time.Now(), EndAt: time.Now().Add(9 * time.Hour), AgeStart: 31, AgeEnd: 40},
+		{Title: "TestPagination10", StartAt: time.Now(), EndAt: time.Now().Add(10 * time.Hour), AgeStart: 31, AgeEnd: 40},
 	}
 	s.db.Delete(&Banner{}, "1=1")
 	s.db.Create(&banners)
