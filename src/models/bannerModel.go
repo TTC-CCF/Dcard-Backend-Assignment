@@ -1,14 +1,11 @@
-package ad
+package models
 
 import (
+	"fmt"
+	"main/utils"
 	"time"
-
-	"encore.dev/storage/sqldb"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
-// Schemas
 type Banner struct {
 	ID        uint
 	Title     string
@@ -36,18 +33,7 @@ type Platform struct {
 	Name string
 }
 
-var adDB = sqldb.NewDatabase("api", sqldb.DatabaseConfig{Migrations: "./migrations"})
-
-func InitDB() (*gorm.DB, error) {
-	db, _ := gorm.Open(postgres.New(postgres.Config{
-		Conn: adDB.Stdlib(),
-	}))
-
-	db.AutoMigrate(&Banner{}, &Gender{}, &Country{}, &Platform{})
-	return db, nil
-}
-
-func (s *Service) CreateBanner(p AdminParams) error {
+func CreateBanner(p utils.AdminParams) error {
 	var genders []Gender
 	var countries []Country
 	var platforms []Platform
@@ -75,13 +61,14 @@ func (s *Service) CreateBanner(p AdminParams) error {
 		Platforms: platforms,
 	}
 
-	return s.db.Create(&banner).Error
+	return db.Create(&banner).Error
 }
 
-func (s *Service) SearchBanners(p PublicParams) ([]Item, error) {
+func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 	var banners []Banner
 	query := "NOW() BETWEEN start_at AND end_at"
 	queryParams := []interface{}{}
+	fmt.Println(p)
 
 	if p.Age != 0 {
 		query += " AND (? BETWEEN age_start AND age_end OR age_end = 0 AND age_start = 0)"
@@ -102,15 +89,15 @@ func (s *Service) SearchBanners(p PublicParams) ([]Item, error) {
 		query += " AND (platforms.name = ? OR platforms.name IS NULL)"
 		queryParams = append(queryParams, p.Platform)
 	}
-
-	res := s.db.
+	fmt.Println(query)
+	res := db.Debug().
 		Distinct("banners.id, banners.title, banners.end_at").
-		Joins("JOIN banner_gender ON banners.id = banner_gender.banner_id").
-		Joins("JOIN genders ON genders.id = banner_gender.gender_id").
-		Joins("JOIN banner_country ON banners.id = banner_country.banner_id").
-		Joins("JOIN countries ON countries.id = banner_country.country_id").
-		Joins("JOIN banner_platform ON banners.id = banner_platform.banner_id").
-		Joins("JOIN platforms ON platforms.id = banner_platform.platform_id").
+		Joins("LEFT OUTER JOIN banner_gender ON banners.id = banner_gender.banner_id").
+		Joins("LEFT OUTER JOIN genders ON genders.id = banner_gender.gender_id").
+		Joins("LEFT OUTER JOIN banner_country ON banners.id = banner_country.banner_id").
+		Joins("LEFT OUTER JOIN countries ON countries.id = banner_country.country_id").
+		Joins("LEFT OUTER JOIN banner_platform ON banners.id = banner_platform.banner_id").
+		Joins("LEFT OUTER JOIN platforms ON platforms.id = banner_platform.platform_id").
 		Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners)
 
 	err := res.Error
@@ -118,9 +105,9 @@ func (s *Service) SearchBanners(p PublicParams) ([]Item, error) {
 		return nil, err
 	}
 
-	var items []Item
+	var items []utils.Item
 	for _, b := range banners {
-		items = append(items, Item{Title: b.Title, EndAt: b.EndAt})
+		items = append(items, utils.Item{Title: b.Title, EndAt: b.EndAt})
 	}
 	return items, nil
 }

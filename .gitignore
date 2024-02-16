@@ -1,4 +1,4 @@
-/.encore
-encore.gen.go
-encore.gen.cue
 testdb
+*.exe
+.env
+db-data
