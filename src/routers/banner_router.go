@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"main/cache"
 	"main/controllers"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +15,7 @@ func Init() *gin.Engine {
 		v1 := api.Group("/v1")
 		{
 			v1.POST("/ad", controllers.CreateBanner)
-			v1.GET("/ad", controllers.SearchBanner)
+			v1.GET("/ad", cache.CacheMiddleware(), controllers.SearchBanners)
 		}
 	}
 

@@ -4,14 +4,15 @@ services:
   api-server:
     build: .
     ports:
-      - "3000:8080"
-    env_file:
-      - ./src/.env
+      - "${PORT}:${APP_PORT}"
     environment:
       - DB_HOST=db
-      - DB_PORT=5432
+      - REDIS_HOST=redis
+    volumes:
+      - ./.env:/app/.env
     depends_on:
       - db
+      - redis
   db:
     image: "postgres:latest"
     environment:
@@ -22,5 +23,26 @@ services:
     volumes:
       - ./db-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
+  redis:
+    image: "redis:latest"
+    ports:
+      - "${REDIS_PORT}:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+  test-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${TEST_DB_DATABASE}
+      POSTGRES_USER: ${TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD}
+    ports:
+      - "${TEST_DB_PORT}:5432"
+  test-redis:
+    image: redis:latest
+    ports:
+      - "${TEST_REDIS_PORT}:6379"
+    environment:
+      REDIS_PASSWORD: ${TEST_REDIS_PASSWORD}
+
     

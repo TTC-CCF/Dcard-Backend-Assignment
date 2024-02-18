@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"main/utils"
 	"time"
 )
@@ -61,14 +60,13 @@ func CreateBanner(p utils.AdminParams) error {
 		Platforms: platforms,
 	}
 
-	return db.Create(&banner).Error
+	return DB.Create(&banner).Error
 }
 
 func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 	var banners []Banner
 	query := "NOW() BETWEEN start_at AND end_at"
 	queryParams := []interface{}{}
-	fmt.Println(p)
 
 	if p.Age != 0 {
 		query += " AND (? BETWEEN age_start AND age_end OR age_end = 0 AND age_start = 0)"
@@ -89,8 +87,7 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 		query += " AND (platforms.name = ? OR platforms.name IS NULL)"
 		queryParams = append(queryParams, p.Platform)
 	}
-	fmt.Println(query)
-	res := db.Debug().
+	res := DB.
 		Distinct("banners.id, banners.title, banners.end_at").
 		Joins("LEFT OUTER JOIN banner_gender ON banners.id = banner_gender.banner_id").
 		Joins("LEFT OUTER JOIN genders ON genders.id = banner_gender.gender_id").
@@ -98,7 +95,7 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 		Joins("LEFT OUTER JOIN countries ON countries.id = banner_country.country_id").
 		Joins("LEFT OUTER JOIN banner_platform ON banners.id = banner_platform.banner_id").
 		Joins("LEFT OUTER JOIN platforms ON platforms.id = banner_platform.platform_id").
-		Where(query, queryParams...).Limit(p.Limit).Offset(p.Offset).Find(&banners)
+		Where(query, queryParams...).Order("end_at asc").Limit(p.Limit).Offset(p.Offset).Find(&banners)
 
 	err := res.Error
 	if err != nil {
