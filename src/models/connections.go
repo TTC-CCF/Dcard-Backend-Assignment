@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -34,7 +35,9 @@ func Init() {
 		)
 	}
 
-	conn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	conn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 
 	if err != nil {
 		for i := 0; i < 10; i++ {

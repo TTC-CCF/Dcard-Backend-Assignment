@@ -95,7 +95,7 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 		Joins("LEFT OUTER JOIN countries ON countries.id = banner_country.country_id").
 		Joins("LEFT OUTER JOIN banner_platform ON banners.id = banner_platform.banner_id").
 		Joins("LEFT OUTER JOIN platforms ON platforms.id = banner_platform.platform_id").
-		Where(query, queryParams...).Order("end_at asc").Limit(p.Limit).Offset(p.Offset).Find(&banners)
+		Where(query, queryParams...).Order("end_at asc").Find(&banners)
 
 	err := res.Error
 	if err != nil {
@@ -103,8 +103,10 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 	}
 
 	var items []utils.Item
-	for _, b := range banners {
-		items = append(items, utils.Item{Title: b.Title, EndAt: b.EndAt})
+	for i, b := range banners {
+		if i >= p.Offset && i < p.Offset+p.Limit {
+			items = append(items, utils.Item{Title: b.Title, EndAt: b.EndAt})
+		}
 	}
 	return items, nil
 }

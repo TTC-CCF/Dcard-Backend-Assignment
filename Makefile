@@ -14,7 +14,7 @@ apiTest:
 	cd ..
 
 loadTest:
-	k6 run src/tests/load_test/script.js
+	k6 run src/tests/load_test/script.js --log-output=none
 
 clean:
 	docker-compose down

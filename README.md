@@ -31,18 +31,19 @@ src/
 │   ├── api_test/
 │   │   ├── api_test.go
 │   ├── load_test/
+│   │   ├── prepare.go # prepare data
 │   │   ├── script.js  # k6 load test
 │   ├── unit_test/
 │   │   ├── cache_test.go
 ├── utils/
-│   ├── params.go   # 各種結構
+│   ├── params.go   # stucts
+│   ├── single_flight.go
 ├── main.go
 ```
 
 ### Setup
 - **Prerequisite**  
-    Go 1.13以上
-    Docker, GNU Make, K6
+    Go 1.13以上, Docker, GNU Make, K6
 - **Run**  
     1. Git clone  
         ```bash
@@ -89,6 +90,9 @@ curl -X POST "http://localhost:4000/api/v1/ad"
 ```
 這個請求會刪除`age`快取裡面的所有key的第一種快取，並刪除`age`快取
 
+### Other detail
+- 使用[singleflight](https://pkg.go.dev/golang.org/x/sync/singleflight)來避快取穿透
+
 ### Testing
 ```bash
 cd src/tests
@@ -107,7 +111,18 @@ make loadTest   # run load test
 - Load Test:
     - 使用[k6](https://k6.io/)壓力測試
     - 模擬隨機url query
-    - 測試結果:  
-        12th Gen Intel(R) Core(TM) i7-12700H，2700 Mhz，14 Cores，20 Logical Processor  
-        21176 requests/second
-        ![](/assets/load_test.png)
+    - 有1000則隨機生成的廣告在資料庫裡(見[prepare.go](/src/tests/load_test/prepare.go))
+    - 12th Gen Intel(R) Core(TM) i7-12700H，2700 Mhz，14 Cores，20 Logical Processor  
+    - 平均QPS: 15729.6821
+
+#### Load Test Result
+
+![](/assets/loadtest1.png)
+*第一次測試*
+
+![](/assets/loadtest2.png)
+*第二次測試*
+
+![](/assets/loadtest3.png)
+*第三次測試*
+

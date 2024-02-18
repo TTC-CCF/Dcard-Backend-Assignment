@@ -52,7 +52,7 @@ func preparePaginationMockData() {
 }
 
 func TestMain(m *testing.M) {
-	godotenv.Load("../../.env")
+	godotenv.Load("../../../.env")
 	os.Setenv("APP_ENV", "test")
 	models.Init()
 	cache.Init()
