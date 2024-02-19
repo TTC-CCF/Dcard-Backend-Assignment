@@ -1,5 +1,5 @@
 # 2024 Dcard Backend Assignments
-
+[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/Ky61gJFZzdfdvn2P1SHRTu/YTLsFYdXP1yTuqBgS4413d/tree/master.svg?style=svg&circle-token=aec08a003b9d5aac71bcea0bb73dd80cf38676b3)](https://dl.circleci.com/status-badge/redirect/circleci/Ky61gJFZzdfdvn2P1SHRTu/YTLsFYdXP1yTuqBgS4413d/tree/master)
 > [!NOTE]
 > ### Two implementations
 > 1. Encore 框架 (放在[encore branch](https://github.com/TTC-CCF/Dcard-Backend-Assignment/tree/encore))
