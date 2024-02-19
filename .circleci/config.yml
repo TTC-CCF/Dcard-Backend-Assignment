@@ -8,8 +8,8 @@ jobs:
       TEST_RESULTS: /tmp/test-results
       TEST_DB_DATABASE: ad_test
       TEST_DB_USER: cicd
-      TEST_DB_PORT: 5432
-      TEST_REDIS_PORT: 6379
+      TEST_DB_PORT: 5433
+      TEST_REDIS_PORT: 6380
       IMAGE_NAME: popuku/dcard-backend-intern-2024
     steps:
       - checkout
@@ -33,7 +33,7 @@ jobs:
           command: |
             for i in `seq 1 10`;
             do
-              nc -z localhost 5432 && echo Success && exit 0
+              nc -z localhost $TEST_DB_PORT && echo Success && exit 0
               echo -n .
               sleep 1
             done
@@ -44,7 +44,7 @@ jobs:
           command: |
             for i in `seq 1 10`;
             do
-              nc -z localhost 6379 && echo Success && exit 0
+              nc -z localhost $TEST_REDIS_PORT && echo Success && exit 0
               echo -n .
               sleep 1
             done
