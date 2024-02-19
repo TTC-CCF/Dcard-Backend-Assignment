@@ -72,7 +72,7 @@ src/
 使用`go-redis`套件，將廣告條件的結果快取起來，降低資料庫負擔也提高QPS。
 我用了兩組快取來維護資料一致性:
 1. key: url path, value: response data
-2. key: (age | gender | country | platform), value: url path
+2. key: (age | gender | country | platform), value: url path  
 第一種快取是為了快速回傳結果，第二種是在建立新廣告的時候，刪除對應條件的快取。
 以下面的request為例:
 ```bash
