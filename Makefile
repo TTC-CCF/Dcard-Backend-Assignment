@@ -1,6 +1,10 @@
 all:
 	docker-compose up -d
 
+build:
+	cd src && go mod download
+	cd ..
+
 testAll:
 	cd src && go test -v ./...
 	cd ..

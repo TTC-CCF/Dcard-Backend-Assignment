@@ -31,6 +31,7 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
   test-db:
+    container_name: test-db
     image: postgres:latest
     environment:
       POSTGRES_DB: ${TEST_DB_DATABASE}
@@ -39,6 +40,7 @@ services:
     ports:
       - "${TEST_DB_PORT}:5432"
   test-redis:
+    container_name: test-redis
     image: redis:latest
     ports:
       - "${TEST_REDIS_PORT}:6379"

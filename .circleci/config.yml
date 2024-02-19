@@ -1,74 +1,66 @@
 version: 2
 jobs:
-  build_and_deploy:
+  build:
     docker:
       - image: cimg/go:1.20.2
-     
+      - image: postgres:16
+        environment:
+          POSTGRES_USER: cicd
+          POSTGRES_PASSWORD: cicd
+          POSTGRES_DB: ad_test
+      - image: redis:7.2.3
     environment:
       TEST_RESULTS: /tmp/test-results
       TEST_DB_DATABASE: ad_test
       TEST_DB_USER: cicd
-      TEST_DB_PORT: 5433
-      TEST_REDIS_PORT: 6380
-      IMAGE_NAME: popuku/dcard-backend-intern-2024
+      TEST_DB_PASSWORD: cicd
+      TEST_DB_PORT: 5432
+      TEST_REDIS_PORT: 6379
     steps:
       - checkout
-      - setup_remote_docker
-
-      - run:
-          name: Install Docker Compose
-          command: |
-            set -x
-            curl -L https://github.com/docker/compose/releases/download/1.11.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
-            chmod +x /usr/local/bin/docker-compose
-
       - run: cp .env.sample .env
-    
-      - run : 
-          name: Set up test database and redis
-          command: docker-compose up -d
-
-      - run:
-          name: Waiting for Postgres to be ready
-          command: |
-            for i in `seq 1 10`;
-            do
-              nc -z localhost $TEST_DB_PORT && echo Success && exit 0
-              echo -n .
-              sleep 1
-            done
-            echo Failed waiting for Postgress && exit 1
-
-      - run:
-          name: Waiting for Redis to be ready
-          command: |
-            for i in `seq 1 10`;
-            do
-              nc -z localhost $TEST_REDIS_PORT && echo Success && exit 0
-              echo -n .
-              sleep 1
-            done
-            echo Failed waiting for Redis && exit 1
-
+      - run: make build
       - run: mkdir -p $TEST_RESULTS
-
+      - run:
+          name: Wait for DB
+          command: dockerize -wait tcp://localhost:${TEST_DB_PORT} -timeout 1m
+      - run:
+          name: Wait for Redis
+          command: dockerize -wait tcp://localhost:${TEST_REDIS_PORT} -timeout 1m
       - run:
           name: Run tests
           command: |           
             make testAll | tee ${TEST_RESULTS}/go-test.out
-
-      - deploy:
-          name: Build and push Docker image
-          command: |
-            TAG="0.0.${CIRCLE_BUILD_NUM}"
-            docker build -t $IMAGE_NAME:$TAG -t $IMAGE_NAME:latest . 
-            docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-            docker push $IMAGE_NAME:$TAG
-            docker push $IMAGE_NAME:latest
-
       - store_artifacts:
           path: /tmp/test-results
           destination: raw-test-output
 
       - store_test_results:
           path: /tmp/test-results
+  deploy:
+    docker:
+      - image: cimg/base:2024.01
+
+    environment:
+      IMAGE_NAME: dcard-backend-intern-2024
+
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build and push Docker image
+          command: |
+            TAG="0.0.${CIRCLE_BUILD_NUM}"
+            docker build -t $DOCKER_USER/$IMAGE_NAME:$TAG -t $DOCKER_USER/$IMAGE_NAME:latest . 
+            docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+            docker push $DOCKER_USER/$IMAGE_NAME:$TAG
+            docker push $DOCKER_USER/$IMAGE_NAME:latest
+
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
