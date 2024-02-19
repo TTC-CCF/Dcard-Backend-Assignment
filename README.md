@@ -62,11 +62,9 @@ src/
     
 
 ### Database Schema
-因為一個廣告可以有多種條件，而且每個條件都是一個固定的集合，基於節省資料儲存空間和優化資料庫查詢效率，我設計many to many的結構。  
+因為一個廣告可以有多種條件，基於節省資料儲存空間和優化資料庫查詢效率，我設計many to many的Schema。    
 此設計達到3NF，如下圖所示:
 ![](/assets/er_diagram.png)
-
-另外，因為gorm會在many to many的conjuction table上面建立index，所以資料庫查詢效率會更好。
 
 ### Cache Data
 使用`go-redis`套件，將廣告條件的結果快取起來，降低資料庫負擔也提高QPS。
@@ -114,6 +112,13 @@ make loadTest   # run load test
     - 有1000則隨機生成的廣告在資料庫裡(見[prepare.go](/src/tests/load_test/prepare.go))
     - 12th Gen Intel(R) Core(TM) i7-12700H，2700 Mhz，14 Cores，20 Logical Processor  
     - 平均QPS: 15729.6821
+    - Setup:
+        ```bash
+        cd src && go run main load_test
+        
+        # in another terminal
+        make loadTest
+        ```
 
 #### Load Test Result
 
