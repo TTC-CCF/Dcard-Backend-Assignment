@@ -36,7 +36,7 @@ func Init() {
 	}
 
 	conn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger: logger.Default.LogMode(logger.Info),
 	})
 
 	if err != nil {

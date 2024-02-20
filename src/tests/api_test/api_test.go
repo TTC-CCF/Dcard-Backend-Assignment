@@ -7,6 +7,7 @@ import (
 	"main/cache"
 	"main/models"
 	"main/routers"
+	"main/tests/load_test"
 	"main/utils"
 	"net/http"
 	"net/http/httptest"
@@ -30,8 +31,10 @@ func prepareFilteringMockData() {
 		{Title: "TestPlatform", StartAt: time.Now(), EndAt: time.Now().Add(4 * time.Hour), AgeStart: 31, AgeEnd: 40, Genders: []models.Gender{{Name: "F"}}, Countries: []models.Country{{Name: "TW"}, {Name: "JP"}}, Platforms: []models.Platform{{Name: "web"}, {Name: "android"}}},
 		{Title: "TestAll", StartAt: time.Now(), EndAt: time.Now().Add(5 * time.Hour)},
 	}
-	models.DB.Delete(&models.Banner{}, "1=1")
-	models.DB.Create(&banners)
+	load_test.DeleteAllData()
+	for _, banner := range banners {
+		models.DB.Create(&banner)
+	}
 }
 
 func preparePaginationMockData() {
@@ -47,16 +50,19 @@ func preparePaginationMockData() {
 		{Title: "TestPagination9", StartAt: time.Now(), EndAt: time.Now().Add(9 * time.Hour), AgeStart: 31, AgeEnd: 40},
 		{Title: "TestPagination10", StartAt: time.Now(), EndAt: time.Now().Add(10 * time.Hour), AgeStart: 31, AgeEnd: 40},
 	}
-	models.DB.Delete(&models.Banner{}, "1=1")
-	models.DB.Create(&banners)
+	load_test.DeleteAllData()
+	for _, banner := range banners {
+		models.DB.Create(&banner)
+	}
 }
 
 func TestMain(m *testing.M) {
 	godotenv.Load("../../../.env")
 	os.Setenv("APP_ENV", "test")
+	fmt.Print(os.Getenv("APP_ENV"))
 	models.Init()
 	cache.Init()
-	models.DB.Delete(&models.Banner{}, "1=1")
+	load_test.DeleteAllData()
 
 	testRouter = routers.Init()
 	m.Run()

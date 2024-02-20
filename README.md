@@ -62,7 +62,7 @@ src/
     
 
 ### Database Schema
-因為一個廣告可以有多種條件，基於節省資料儲存空間和優化資料庫查詢效率，我設計many to many的Schema。    
+因為一個廣告可以有多種條件，基於節省資料儲存空間和優化資料庫查詢效率，我設計many to many的Schema。這種設計在未來如果有對Gender、Country、Platform等等條件的擴充也會比較方便。  
 此設計達到3NF，如下圖所示:
 ![](/assets/er_diagram.png)
 
@@ -92,33 +92,33 @@ curl -X POST "http://localhost:4000/api/v1/ad"
 - 使用[singleflight](https://pkg.go.dev/golang.org/x/sync/singleflight)來避快取穿透
 
 ### Testing
+#### Run Test:
 ```bash
 cd src/tests
 make testAll    # run all tests
 make unitTest   # run unit test
 make apiTest    # run api test
-make loadTest   # run load test
 ```  
-- Unit Test: 
-    - 針對`cache.go`裡的一些function做單元測試
-    - 使用[redismock](https://github.com/go-redis/redismock)
-- API Test:
-    - 測試API參數驗證
-    - 測試API回傳結果
-    - 在testDB裡面測試
-- Load Test:
-    - 使用[k6](https://k6.io/)壓力測試
-    - 模擬隨機url query
-    - 有1000則隨機生成的廣告在資料庫裡(見[prepare.go](/src/tests/load_test/prepare.go))
-    - 12th Gen Intel(R) Core(TM) i7-12700H，2700 Mhz，14 Cores，20 Logical Processor  
-    - 平均QPS: 15729.6821
-    - Setup:
-        ```bash
-        cd src && go run main load_test
-        
-        # in another terminal
-        make loadTest
-        ```
+#### Unit Test: 
+- 針對`cache.go`裡的一些function做單元測試
+- 使用[redismock](https://github.com/go-redis/redismock)
+#### API Test:
+- 測試API參數驗證
+- 測試API回傳結果
+- 在testDB裡面測試
+#### Load Test:
+- 使用[k6](https://k6.io/)壓力測試
+- 模擬隨機url query
+- 有1000則隨機生成的廣告在資料庫裡(見[prepare.go](/src/tests/load_test/prepare.go))
+- 12th Gen Intel(R) Core(TM) i7-12700H，2700 Mhz，14 Cores，20 Logical Processor  
+- 平均QPS: 15729.6821
+- Setup:
+    ```bash
+    cd src && go run main load_test # 在local端啟動api server
+    
+    # in another terminal
+    make loadTest
+    ```
 
 #### Load Test Result
 

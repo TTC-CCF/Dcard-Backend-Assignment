@@ -1,8 +1,11 @@
 package models
 
 import (
+	"fmt"
 	"main/utils"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Banner struct {
@@ -19,17 +22,44 @@ type Banner struct {
 
 type Gender struct {
 	ID   uint
-	Name string
+	Name string `gorm:"unique"`
 }
 
 type Country struct {
 	ID   uint
-	Name string
+	Name string `gorm:"unique"`
 }
 
 type Platform struct {
 	ID   uint
-	Name string
+	Name string `gorm:"unique"`
+}
+
+func (g *Gender) BeforeCreate(tx *gorm.DB) (err error) {
+	var dup Gender
+	if result := tx.First(&dup, "name = ?", g.Name); result.RowsAffected != 0 {
+		g.ID = dup.ID
+		return nil
+	}
+	return nil
+}
+
+func (c *Country) BeforeCreate(tx *gorm.DB) (err error) {
+	var dup Country
+	if result := tx.First(&dup, "name = ?", c.Name); result.RowsAffected != 0 {
+		c.ID = dup.ID
+		return nil
+	}
+	return nil
+}
+
+func (p *Platform) BeforeCreate(tx *gorm.DB) (err error) {
+	var dup Platform
+	if result := tx.First(&dup, "name = ?", p.Name); result.RowsAffected != 0 {
+		p.ID = dup.ID
+		return nil
+	}
+	return nil
 }
 
 func CreateBanner(p utils.AdminParams) error {
@@ -108,5 +138,6 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 			items = append(items, utils.Item{Title: b.Title, EndAt: b.EndAt})
 		}
 	}
+	fmt.Println(items)
 	return items, nil
 }
