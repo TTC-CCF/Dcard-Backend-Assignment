@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"main/utils"
 	"time"
 
@@ -138,6 +137,5 @@ func SearchBanner(p utils.PublicParams) ([]utils.Item, error) {
 			items = append(items, utils.Item{Title: b.Title, EndAt: b.EndAt})
 		}
 	}
-	fmt.Println(items)
 	return items, nil
 }

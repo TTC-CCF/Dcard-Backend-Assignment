@@ -1,5 +1,10 @@
 version: 2.1
+
+orbs:
+  gcp-cli: circleci/gcp-cli@2.2.0
+
 jobs:
+  
   build_and_test:
     docker:
       - image: cimg/go:1.20.2
@@ -41,13 +46,11 @@ jobs:
 
       - store_test_results:
           path: /tmp/test-results
-  deploy:
+  publish_docker_image:
+    environment:  
+      IMAGE_NAME: dcard-backend-intern-2024
     docker:
       - image: cimg/base:2024.01
-
-    environment:
-      IMAGE_NAME: dcard-backend-intern-2024
-
     steps:
       - checkout
       - setup_remote_docker
@@ -59,11 +62,26 @@ jobs:
             docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
             docker push $DOCKER_USER/$IMAGE_NAME:$TAG
             docker push $DOCKER_USER/$IMAGE_NAME:latest
+  deploy:
+    executor: gcp-cli/default
+    environment:
+      IMAGE_NAME: dcard-backend-intern-2024
+    steps:
+    - gcp-cli/install
+    - gcp-cli/initialize
+    - run:
+        name: deploy service
+        command: |
+          export cmd='cd dcard-backend-assignment-demo && sudo docker-compose down && sudo docker rmi '
+          gcloud --quiet compute ssh  "$GCE_INSTANCE_NAME" --tunnel-through-iap --command="$cmd $DOCKER_USER/$IMAGE_NAME:latest || true && sudo docker-compose up -d"
 
 workflows:
   build_and_deploy:
     jobs:
       - build_and_test
-      - deploy:
+      - publish_docker_image:
           requires:
             - build_and_test
+      - deploy:
+          requires:
+            - publish_docker_image
