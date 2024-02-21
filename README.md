@@ -91,7 +91,7 @@ curl -X POST "http://localhost:4000/api/v1/ad"
 ### Other detail
 - 使用[singleflight](https://pkg.go.dev/golang.org/x/sync/singleflight)來避快取穿透
 - 使用CircleCI做CI/CD，自動化測試、發布Docker image到Docker Hub並部署到GCE
-- Demo: [http://34.123.38.70:3000/api/v1/ad](http://34.123.38.70:3000/api/v1/)
+- Demo: [http://34.123.38.70:3000/api/v1/ad](http://34.123.38.70:3000/api/v1/ad)
 
 ### Testing
 #### Run Test:
