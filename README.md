@@ -36,7 +36,7 @@ src/
 │   ├── unit_test/
 │   │   ├── cache_test.go
 ├── utils/
-│   ├── params.go   # stucts
+│   ├── params.go   # structs
 │   ├── single_flight.go
 ├── main.go
 ```
